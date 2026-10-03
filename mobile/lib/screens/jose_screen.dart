@@ -6,10 +6,14 @@ import '../services/jose.dart';
 import '../state/app.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'can_i_buy_screen.dart';
+import 'memory_screen.dart';
 import 'profile_screen.dart';
 
 class JoseScreen extends StatefulWidget {
-  const JoseScreen({super.key});
+  const JoseScreen({super.key, this.initialMessage, this.standalone = false});
+  final String? initialMessage;
+  final bool standalone;
 
   @override
   State<JoseScreen> createState() => _JoseScreenState();
@@ -21,13 +25,24 @@ class _JoseScreenState extends State<JoseScreen> {
   bool _thinking = false;
 
   static const _suggestions = [
+    'Como vai fechar meu mês?',
     'Onde estou gastando demais?',
+    'Monte um plano para eu investir R\$ 500 por mês',
+    'Quais assinaturas eu deveria cancelar?',
     'Anota: gastei 32 no almoço hoje',
-    'Onde invisto R\$ 300 por mês?',
-    'Cria uma meta de 400 para Lazer',
-    'Quanto gastei com comida esse mês?',
-    'Me ajuda a montar uma reserva de emergência',
+    'Qual dívida eu pago primeiro?',
+    'Quanto preciso de reserva de emergência?',
+    'Tesouro Selic ou CDB hoje?',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    final first = widget.initialMessage;
+    if (first != null && first.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _send(first));
+    }
+  }
 
   @override
   void dispose() {
@@ -57,11 +72,13 @@ class _JoseScreenState extends State<JoseScreen> {
   void _toBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
-        _scroll.animateTo(_scroll.position.maxScrollExtent + 200,
-            duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+        _scroll.animateTo(_scroll.position.maxScrollExtent + 300,
+            duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
       }
     });
   }
+
+  void _push(Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 
   @override
   Widget build(BuildContext context) {
@@ -70,17 +87,37 @@ class _JoseScreenState extends State<JoseScreen> {
       builder: (context, _) {
         return Scaffold(
           appBar: AppBar(
-            titleSpacing: 16,
+            titleSpacing: widget.standalone ? 0 : 16,
             title: Row(children: [
-              const JoseAvatar(size: 36),
+              const JoseAvatar(size: 38),
               const SizedBox(width: 10),
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(AppConfig.assistantName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-                Text(_thinking ? 'digitando...' : 'seu assistente financeiro',
-                    style: const TextStyle(color: C.muted, fontSize: 12, fontWeight: FontWeight.w500)),
-              ]),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(AppConfig.assistantName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: Text(
+                      _thinking ? 'pensando...' : 'gênio das suas finanças',
+                      key: ValueKey(_thinking),
+                      style: TextStyle(
+                          color: _thinking ? C.green : C.muted, fontSize: 12, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ]),
+              ),
             ]),
             actions: [
+              IconButton(
+                tooltip: 'O que o José sabe',
+                onPressed: () => _push(const MemoryScreen()),
+                icon: Badge(
+                  isLabelVisible: app.memories.isNotEmpty,
+                  label: Text('${app.memories.length}'),
+                  backgroundColor: C.ink,
+                  textColor: C.lime,
+                  child: const Icon(Icons.psychology_outlined),
+                ),
+              ),
               if (app.chat.isNotEmpty)
                 IconButton(
                   tooltip: 'Nova conversa',
@@ -95,7 +132,7 @@ class _JoseScreenState extends State<JoseScreen> {
           body: Column(children: [
             Expanded(
               child: !app.gemini.configured
-                  ? _setupCard(context)
+                  ? _setupCard()
                   : app.chat.isEmpty
                       ? _welcome()
                       : ListView.builder(
@@ -103,12 +140,16 @@ class _JoseScreenState extends State<JoseScreen> {
                           padding: const EdgeInsets.fromLTRB(14, 8, 14, 16),
                           itemCount: app.chat.length + (_thinking ? 1 : 0),
                           itemBuilder: (context, i) {
-                            if (i == app.chat.length) return _bubble('...', fromUser: false, typing: true);
+                            if (i == app.chat.length) return _bubble('', fromUser: false, typing: true);
                             final m = app.chat[i];
                             if (m is ChatMsgError) {
                               return Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 6),
-                                child: Text(m.text, style: const TextStyle(color: C.red)),
+                                child: AppCard(
+                                  color: const Color(0xFFFEF2F2),
+                                  padding: const EdgeInsets.all(12),
+                                  child: Text(m.text, style: const TextStyle(color: C.red)),
+                                ),
                               );
                             }
                             if (m.isNote) {
@@ -124,8 +165,12 @@ class _JoseScreenState extends State<JoseScreen> {
             if (app.gemini.configured)
               SafeArea(
                 top: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                  decoration: const BoxDecoration(
+                    color: C.bg,
+                    border: Border(top: BorderSide(color: C.line)),
+                  ),
                   child: Row(children: [
                     Expanded(
                       child: TextField(
@@ -135,7 +180,7 @@ class _JoseScreenState extends State<JoseScreen> {
                         textCapitalization: TextCapitalization.sentences,
                         onSubmitted: (_) => _send(),
                         decoration: const InputDecoration(
-                          hintText: 'Pergunte ou peça para anotar um gasto...',
+                          hintText: 'Pergunte, peça um plano ou anote um gasto...',
                           contentPadding: EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                         ),
                       ),
@@ -158,18 +203,32 @@ class _JoseScreenState extends State<JoseScreen> {
   Widget _welcome() => ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          const SizedBox(height: 20),
-          const Center(child: JoseAvatar(size: 72)),
+          const SizedBox(height: 12),
+          const Center(child: JoseAvatar(size: 76)),
           const SizedBox(height: 16),
-          Text('E aí! Eu sou o ${AppConfig.assistantName}.',
+          Text('E aí${app.profile.name.isNotEmpty ? ', ${app.profile.name.split(' ').first}' : ''}! Eu sou o ${AppConfig.assistantName}.',
               textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
           const Text(
-            'Vejo seus gastos, metas e investimentos. Posso anotar lançamentos, criar metas e te dizer onde investir.',
+            'Enxergo seus gastos, metas, dívidas e investimentos, consulto as taxas do dia e lembro do que você me conta. '
+            'Também anoto lançamentos, crio metas, regras e categorias pra você.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: C.muted, height: 1.4),
+            style: TextStyle(color: C.muted, height: 1.45),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 18),
+          AppCard(
+            onTap: () => _push(const CanIBuyScreen()),
+            child: const Row(children: [
+              Icon(Icons.shopping_cart_checkout),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text('Posso comprar isso? Me diga o preço que eu faço as contas.',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+              Icon(Icons.chevron_right),
+            ]),
+          ),
+          const SizedBox(height: 18),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -188,56 +247,100 @@ class _JoseScreenState extends State<JoseScreen> {
         ],
       );
 
-  Widget _setupCard(BuildContext context) => ListView(
+  Widget _setupCard() => ListView(
         padding: const EdgeInsets.all(20),
         children: [
           const SizedBox(height: 20),
           const Center(child: JoseAvatar(size: 72)),
           const SizedBox(height: 16),
-          const Text('Falta só a chave do Gemini',
+          const Text('O José está sem cérebro (chave do Gemini)',
               textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
           const SizedBox(height: 8),
           const Text(
-            'Gere uma chave gratuita em aistudio.google.com (Get API key) e cole no Perfil. '
-            'Ela fica salva só na sua conta.',
+            'No APK oficial a chave já vem embutida. Se você está na versão web ou num build sem a chave, '
+            'cole uma chave do aistudio.google.com no Perfil.',
             textAlign: TextAlign.center,
             style: TextStyle(color: C.muted, height: 1.4),
           ),
           const SizedBox(height: 20),
-          FilledButton(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
-            child: const Text('Abrir Perfil'),
-          ),
+          FilledButton(onPressed: () => _push(const ProfileScreen()), child: const Text('Abrir Perfil')),
         ],
       );
 
   Widget _bubble(String text, {required bool fromUser, bool typing = false}) {
     return Align(
       alignment: fromUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
-        decoration: BoxDecoration(
-          color: fromUser ? C.ink : Colors.white,
-          border: fromUser ? null : Border.all(color: C.line),
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(20),
-            topRight: const Radius.circular(20),
-            bottomLeft: Radius.circular(fromUser ? 20 : 6),
-            bottomRight: Radius.circular(fromUser ? 6 : 20),
-          ),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 250),
+        builder: (context, v, child) => Opacity(
+          opacity: v,
+          child: Transform.translate(offset: Offset(0, (1 - v) * 8), child: child),
         ),
-        child: typing
-            ? const SizedBox(
-                width: 32,
-                height: 16,
-                child: Center(child: LinearProgressIndicator(color: C.ink, backgroundColor: C.soft)),
-              )
-            : fromUser
-                ? Text(text, style: const TextStyle(color: Colors.white, height: 1.4))
-                : RichMd(text),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.84),
+          decoration: BoxDecoration(
+            color: fromUser ? C.ink : Colors.white,
+            border: fromUser ? null : Border.all(color: C.line),
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(20),
+              topRight: const Radius.circular(20),
+              bottomLeft: Radius.circular(fromUser ? 20 : 6),
+              bottomRight: Radius.circular(fromUser ? 6 : 20),
+            ),
+          ),
+          child: typing
+              ? const _TypingDots()
+              : fromUser
+                  ? Text(text, style: const TextStyle(color: Colors.white, height: 1.4))
+                  : RichMd(text),
+        ),
       ),
     );
   }
+}
+
+/// Três pontinhos pulando enquanto o José pensa.
+class _TypingDots extends StatefulWidget {
+  const _TypingDots();
+
+  @override
+  State<_TypingDots> createState() => _TypingDotsState();
+}
+
+class _TypingDotsState extends State<_TypingDots> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
+    ..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 42,
+      height: 16,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (context, _) => Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          for (var i = 0; i < 3; i++)
+            Transform.translate(
+              offset: Offset(0, -4 * _bounce((_c.value + i * 0.2) % 1)),
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(color: C.ink, shape: BoxShape.circle),
+              ),
+            ),
+        ]),
+      ),
+    );
+  }
+
+  double _bounce(double t) => t < 0.5 ? t * 2 : (1 - t) * 2;
 }

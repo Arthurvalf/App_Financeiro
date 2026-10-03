@@ -5,6 +5,7 @@ import '../models.dart';
 import '../state/app.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'calendar_screen.dart';
 import 'tx_editor.dart';
 
 class TransactionsScreen extends StatefulWidget {
@@ -35,7 +36,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
         final usedCats = cats.where((c) => app.txs.any((t) => t.category == c.name)).toList();
 
         return Scaffold(
-          appBar: AppBar(title: const Text('Lançamentos')),
+          appBar: AppBar(title: const Text('Lançamentos'), actions: [
+            IconButton(
+              tooltip: 'Calendário',
+              icon: const Icon(Icons.calendar_month_outlined),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CalendarScreen())),
+            ),
+          ]),
           floatingActionButton: const AddTxButton(),
           body: Column(children: [
             Padding(

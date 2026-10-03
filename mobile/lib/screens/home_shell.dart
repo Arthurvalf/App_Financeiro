@@ -1,13 +1,16 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../services/native.dart';
 
 import '../state/app.dart';
 import '../widgets/common.dart';
-import 'budgets_screen.dart';
 import 'dashboard_screen.dart';
 import 'invest_screen.dart';
 import 'jose_screen.dart';
+import 'plans_screen.dart';
 import 'transactions_screen.dart';
 
 class HomeShell extends StatefulWidget {
@@ -26,6 +29,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _tick();
+    _askNotificationsOnce();
     _poll = Timer.periodic(const Duration(seconds: 6), (_) => _tick());
   }
 
@@ -49,6 +53,15 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     }
   }
 
+  /// No Android 13+ as notificações precisam de permissão. Pede uma vez só.
+  Future<void> _askNotificationsOnce() async {
+    if (!NativeBridge.supported) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('asked_notifications') == true) return;
+    await prefs.setBool('asked_notifications', true);
+    if (!await NativeBridge.notificationsAllowed()) await NativeBridge.requestNotificationPermission();
+  }
+
   void goTo(int i) => setState(() => _tab = i);
 
   @override
@@ -57,7 +70,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       DashboardScreen(onNavigate: goTo),
       const TransactionsScreen(),
       const JoseScreen(),
-      const BudgetsScreen(),
+      const PlansScreen(),
       const InvestScreen(),
     ];
     return Scaffold(
@@ -69,7 +82,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           NavigationDestination(icon: Icon(Icons.space_dashboard_outlined), selectedIcon: Icon(Icons.space_dashboard), label: 'Início'),
           NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'Gastos'),
           NavigationDestination(icon: JoseAvatar(size: 28), label: 'José Pinto'),
-          NavigationDestination(icon: Icon(Icons.flag_outlined), selectedIcon: Icon(Icons.flag), label: 'Metas'),
+          NavigationDestination(icon: Icon(Icons.flag_outlined), selectedIcon: Icon(Icons.flag), label: 'Planos'),
           NavigationDestination(icon: Icon(Icons.trending_up_outlined), selectedIcon: Icon(Icons.trending_up), label: 'Investir'),
         ],
       ),

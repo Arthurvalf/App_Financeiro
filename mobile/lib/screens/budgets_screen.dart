@@ -100,7 +100,6 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
         final totalLimit = entries.fold(0.0, (s, e) => s + e.value);
         final totalSpent = entries.fold(0.0, (s, e) => s + app.spentIn(m, category: e.key));
         return Scaffold(
-          appBar: AppBar(title: const Text('Metas do mês')),
           floatingActionButton: FloatingActionButton.extended(
             heroTag: null,
             backgroundColor: C.ink,
@@ -111,7 +110,7 @@ class _BudgetsScreenState extends State<BudgetsScreen> {
             label: const Text('Nova meta', style: TextStyle(fontWeight: FontWeight.w700)),
           ),
           body: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
             children: [
               if (entries.isNotEmpty)
                 AppCard(

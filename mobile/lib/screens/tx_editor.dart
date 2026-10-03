@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../models.dart';
-import '../services/categorizer.dart';
 import '../state/app.dart';
 import '../theme.dart';
 
@@ -35,6 +34,8 @@ class _TxEditorState extends State<_TxEditor> {
   late DateTime _date = widget.tx?.date ?? DateTime.now();
   bool _catTouched = false;
   String? _error;
+  int _installments = 1; // 1 = à vista
+  late final String? _originalCat = widget.tx?.category;
 
   @override
   void initState() {
@@ -42,7 +43,7 @@ class _TxEditorState extends State<_TxEditor> {
     _catTouched = widget.tx != null;
     _desc.addListener(() {
       if (!_catTouched && _desc.text.trim().length > 2) {
-        final g = guessCategory(_desc.text, isIncome: _income);
+        final g = app.categorize(_desc.text, isIncome: _income);
         if (g != _cat) setState(() => _cat = g);
       }
     });
@@ -65,7 +66,7 @@ class _TxEditorState extends State<_TxEditor> {
       setState(() => _error = 'Dê uma descrição (ex.: Mercado).');
       return;
     }
-    final cat = _cat ?? guessCategory(_desc.text, isIncome: _income);
+    final cat = _cat ?? app.categorize(_desc.text, isIncome: _income);
     final t = widget.tx ??
         Tx(id: newId(), description: '', amount: 0, isIncome: _income, category: cat, date: _date);
     t
@@ -75,9 +76,61 @@ class _TxEditorState extends State<_TxEditor> {
       ..category = _income ? (cat == 'Outros' ? 'Renda' : cat) : cat
       ..date = _date
       ..aiCategorized = _catTouched || t.aiCategorized;
+    final messenger = ScaffoldMessenger.of(context);
     Navigator.pop(context);
+
+    // Compra parcelada: vira uma dívida e cada parcela é lançada no seu mês.
+    if (!_income && _installments > 1) {
+      if (widget.tx != null) await app.deleteTx(widget.tx!);
+      await app.saveDebt(Debt(
+        id: newId(),
+        name: t.description,
+        kind: 'cartao',
+        installmentAmount: double.parse((v / _installments).toStringAsFixed(2)),
+        installments: _installments,
+        firstDue: _date,
+        autoLaunch: true,
+        category: t.category,
+      ));
+      messenger.showSnackBar(SnackBar(
+          content: Text('Parcelado em ${_installments}x de ${brl(v / _installments)}. Veja em Planos → Dívidas.')));
+      return;
+    }
+
     await app.saveTx(t);
     if (t.category == 'Outros') app.aiCategorizePending();
+
+    // Trocou a categoria? Oferece criar uma regra para as próximas.
+    final changed = _originalCat != null && _originalCat != t.category && !t.isIncome;
+    if (changed) {
+      final pattern = _rulePattern(t.description);
+      if (pattern.isNotEmpty && !app.rules.any((r) => r.pattern.toLowerCase() == pattern)) {
+        messenger.showSnackBar(SnackBar(
+          duration: const Duration(seconds: 6),
+          content: Text('Sempre colocar "$pattern" em ${t.category}?'),
+          action: SnackBarAction(
+            label: 'Criar regra',
+            textColor: C.lime,
+            onPressed: () async {
+              await app.addRule(pattern, t.category);
+              await app.applyRulesToAll();
+            },
+          ),
+        ));
+      }
+    }
+  }
+
+  /// Primeira palavra significativa da descrição (ex.: "Posto Shell 123" -> "posto shell").
+  String _rulePattern(String description) {
+    final words = description
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-zà-ú0-9 ]'), ' ')
+        .split(RegExp(r'\s+'))
+        .where((w) => w.length >= 3 && int.tryParse(w) == null)
+        .toList();
+    if (words.isEmpty) return '';
+    return words.take(2).join(' ');
   }
 
   Future<void> _delete() async {
@@ -105,7 +158,7 @@ class _TxEditorState extends State<_TxEditor> {
             onSelectionChanged: (s) => setState(() {
               _income = s.first;
               if (_income && !_catTouched) _cat = 'Renda';
-              if (!_income && _cat == 'Renda') _cat = guessCategory(_desc.text);
+              if (!_income && _cat == 'Renda') _cat = app.categorize(_desc.text);
             }),
           ),
           const SizedBox(height: 14),
@@ -156,6 +209,30 @@ class _TxEditorState extends State<_TxEditor> {
               if (d != null) setState(() => _date = DateTime(d.year, d.month, d.day, _date.hour, _date.minute));
             },
           ),
+          if (!_income) ...[
+            const SizedBox(height: 14),
+            Text('Pagamento', style: t.labelLarge?.copyWith(color: C.muted)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final n in const [1, 2, 3, 4, 5, 6, 10, 12])
+                ChoiceChip(
+                  label: Text(n == 1 ? 'À vista' : '${n}x'),
+                  selected: _installments == n,
+                  showCheckmark: false,
+                  selectedColor: C.lime,
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: C.line),
+                  shape: const StadiumBorder(),
+                  onSelected: (_) => setState(() => _installments = n),
+                ),
+            ]),
+            if (_installments > 1)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('O valor acima é o total. Cada parcela entra no mês dela.',
+                    style: TextStyle(color: C.muted, fontSize: 12)),
+              ),
+          ],
           if (widget.tx?.raw != null) ...[
             const SizedBox(height: 10),
             Text('Notificação original: ${widget.tx!.raw}', style: const TextStyle(color: C.muted, fontSize: 12)),

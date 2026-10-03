@@ -3,11 +3,16 @@
 App pessoal de finanças em Flutter:
 
 - **Login por e-mail e senha** (Firebase Authentication). Cada pessoa tem sua conta e seus dados.
-- **Captura automática do Nubank**: o app lê as notificações do Nubank (compras aprovadas, Pix enviados/recebidos) e cria o lançamento sozinho, já categorizado.
-- **José Pinto**, o assistente com IA (Google Gemini): conversa sobre seus gastos, anota lançamentos ("gastei 30 no almoço"), cria metas, analisa o mês e recomenda investimentos conforme seu perfil de risco, com nota e nível de risco.
-- **Metas por categoria** com alertas quando chegam a 80% e 100%.
-- **Carteira de investimentos** e perfil de investidor.
-- Dados na nuvem (Cloud Firestore), protegidos por regras: cada usuário só acessa os próprios dados.
+- **Captura automática do Nubank**: lê as notificações do Nubank (compras, Pix) e cria o lançamento sozinho, já categorizado, com aviso na hora.
+- **José Pinto** (Google Gemini): conversa sobre seus números reais, prevê o fechamento do mês, detecta assinaturas,
+  recomenda investimentos com nota e risco, pesquisa taxas atuais no Google, **lembra do que você conta** e executa ações
+  (anotar gastos, criar metas, dívidas, categorias e regras).
+- **Posso comprar isso?**: veredito do José com o impacto no mês, nas metas e nas parcelas futuras.
+- **Planos**: metas por categoria, **dívidas e parcelas** (cada parcela entra no mês dela) e **simulador "e se"**
+  com Selic/CDI/IPCA reais do Banco Central.
+- **Calendário de gastos** (mapa de calor do mês).
+- **Categorias próprias e regras automáticas** ("contém posto → Transporte").
+- **Widget na tela inicial** e **notificações**: gasto capturado, metas em 80%/100%, parcela vencendo, resumo semanal e dia do salário.
 
 ## Como o APK é gerado
 
@@ -46,11 +51,16 @@ Use **Simular compra** para testar sem gastar nada, e **Ver capturas** para ver 
 - Firestore Database criado. Em **Regras**, cole o conteúdo de [`firestore.rules`](firestore.rules) e publique.
 - A configuração pública do projeto está em `lib/config.dart`.
 
-## Chave do Gemini
+## Chave do Gemini (embutida no APK)
 
-Gere em [aistudio.google.com](https://aistudio.google.com) e cole no app (Perfil → Testar e salvar chave).
-A chave não vai para o GitHub: fica salva só na sua conta. O app tenta automaticamente os modelos atuais
-do Gemini (lista em `lib/config.dart`) e usa o primeiro que responder.
+1. No GitHub: **Settings → Secrets and variables → Actions → New repository secret**.
+2. Nome: `GEMINI_API_KEY`. Valor: sua chave do [aistudio.google.com](https://aistudio.google.com).
+3. Rode o build de novo (qualquer push em `mobile/` ou *Actions → Build APK + Web → Run workflow*).
+
+O build embaralha a chave e a injeta só no APK (a versão web pública não recebe a chave; lá dá para colar uma no Perfil).
+Ela nunca fica no código nem nos logs. Observação honesta: qualquer chave dentro de um app pode ser extraída por alguém
+determinado; o embaralhamento só impede que ela seja achada facilmente. Para um app pessoal o risco é baixo (no máximo,
+alguém gastar sua cota gratuita) e você pode trocar a chave quando quiser.
 
 ## Estrutura
 

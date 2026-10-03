@@ -252,3 +252,197 @@ double asDouble(dynamic v) {
   if (s.contains(',')) s = s.replaceAll('.', '').replaceAll(',', '.');
   return double.tryParse(s) ?? 0;
 }
+
+/// Valor em reais que "conta" até o número (animação suave).
+class AnimatedMoney extends StatelessWidget {
+  const AnimatedMoney(this.value, {super.key, this.style});
+  final double value;
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: value),
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.easeOutCubic,
+      builder: (context, v, _) => Text(brl(v), style: style),
+    );
+  }
+}
+
+/// Botão redondo de atalho com legenda.
+class QuickAction extends StatelessWidget {
+  const QuickAction({super.key, required this.icon, required this.label, required this.onTap, this.highlight = false});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 54,
+            height: 54,
+            decoration: BoxDecoration(
+              color: highlight ? C.lime : Colors.white,
+              shape: BoxShape.circle,
+              border: highlight ? null : Border.all(color: C.line),
+            ),
+            child: Icon(icon, color: C.ink, size: 24),
+          ),
+          const SizedBox(height: 6),
+          Text(label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, height: 1.15)),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Gráfico de linhas simples (simulador).
+class LineSeries {
+  LineSeries(this.values, this.color, {this.fill = false});
+  final List<double> values;
+  final Color color;
+  final bool fill;
+}
+
+class SimpleLineChart extends StatelessWidget {
+  const SimpleLineChart({super.key, required this.series, this.height = 180, this.labels = const []});
+  final List<LineSeries> series;
+  final double height;
+  final List<String> labels;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      SizedBox(height: height, width: double.infinity, child: CustomPaint(painter: _LinePainter(series))),
+      if (labels.isNotEmpty) ...[
+        const SizedBox(height: 6),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          for (final l in labels) Text(l, style: const TextStyle(fontSize: 11, color: C.muted)),
+        ]),
+      ],
+    ]);
+  }
+}
+
+class _LinePainter extends CustomPainter {
+  _LinePainter(this.series);
+  final List<LineSeries> series;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final all = series.expand((s) => s.values).toList();
+    if (all.isEmpty) return;
+    final maxV = all.reduce(max) * 1.05;
+    if (maxV <= 0) return;
+    final grid = Paint()
+      ..color = C.line
+      ..strokeWidth = 1;
+    for (var i = 1; i <= 3; i++) {
+      final y = size.height * i / 4;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    }
+    for (final s in series) {
+      if (s.values.length < 2) continue;
+      final path = Path();
+      for (var i = 0; i < s.values.length; i++) {
+        final x = size.width * i / (s.values.length - 1);
+        final y = size.height - (s.values[i] / maxV) * size.height;
+        if (i == 0) {
+          path.moveTo(x, y);
+        } else {
+          path.lineTo(x, y);
+        }
+      }
+      if (s.fill) {
+        final area = Path.from(path)
+          ..lineTo(size.width, size.height)
+          ..lineTo(0, size.height)
+          ..close();
+        canvas.drawPath(
+          area,
+          Paint()
+            ..shader = LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [s.color.withValues(alpha: 0.35), s.color.withValues(alpha: 0.02)],
+            ).createShader(Offset.zero & size),
+        );
+      }
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = s.color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LinePainter old) => true;
+}
+
+/// Barras verticais simples (compromissos por mês, calendário etc.).
+class MiniBars extends StatelessWidget {
+  const MiniBars({super.key, required this.values, required this.labels, this.height = 110, this.color = C.ink});
+  final List<double> values;
+  final List<String> labels;
+  final double height;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxV = values.isEmpty ? 0.0 : values.reduce(max);
+    return SizedBox(
+      height: height + 34,
+      child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        for (var i = 0; i < values.length; i++)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                Text(values[i] >= 1000 ? '${(values[i] / 1000).toStringAsFixed(1)}k' : values[i].toStringAsFixed(0),
+                    style: const TextStyle(fontSize: 10, color: C.muted)),
+                const SizedBox(height: 4),
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeOutCubic,
+                  height: maxV <= 0 ? 4 : max(4, height * values[i] / maxV),
+                  decoration: BoxDecoration(
+                    color: i == 0 ? C.lime : color,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(labels[i], style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+              ]),
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
+/// Cabeçalho com gradiente escuro usado nos cartões de destaque.
+BoxDecoration heroDecoration() => BoxDecoration(
+      borderRadius: BorderRadius.circular(28),
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF111111), Color(0xFF1B1F10), Color(0xFF2A3510)],
+        stops: [0, 0.6, 1],
+      ),
+    );

@@ -9,7 +9,11 @@ import '../state/app.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'calendar_screen.dart';
+import 'can_i_buy_screen.dart';
+import 'debts_screen.dart';
 import 'profile_screen.dart';
+import 'simulator_screen.dart';
 import 'tx_editor.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -40,6 +44,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  void _push(Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+
+  String _greeting() {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Bom dia';
+    if (h < 18) return 'Boa tarde';
+    return 'Boa noite';
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -47,15 +60,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (context, _) {
         final t = Theme.of(context).textTheme;
         final m = app.month;
+        final now = DateTime.now();
+        final isCurrent = m.year == now.year && m.month == now.month;
         final spent = app.spentIn(m);
         final income = app.incomeIn(m);
         final invested = app.investedIn(m);
         final byCat = app.byCategory(m);
         final prevSpent = app.spentIn(DateTime(m.year, m.month - 1));
         final recent = app.txsOf(m).take(5).toList();
-        final isCurrent = m.year == DateTime.now().year && m.month == DateTime.now().month;
         final alerts = isCurrent ? app.alerts() : <AppAlert>[];
         final firstName = app.profile.name.split(' ').first;
+        final upcoming = app.debts.where((d) => d.nextDue() != null).toList()
+          ..sort((a, b) => a.nextDue()!.compareTo(b.nextDue()!));
 
         return Scaffold(
           floatingActionButton: const AddTxButton(),
@@ -68,31 +84,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 SafeArea(
                   bottom: false,
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 14, bottom: 14),
+                    padding: const EdgeInsets.only(top: 14, bottom: 16),
                     child: Row(children: [
                       Expanded(
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(firstName.isEmpty ? 'Olá!' : 'Olá, $firstName',
+                          Text('${_greeting()}${firstName.isEmpty ? '' : ', $firstName'}',
                               style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800, letterSpacing: -0.8)),
                           Text('Seu dinheiro, em ordem.', style: t.bodyMedium?.copyWith(color: C.muted)),
                         ]),
                       ),
                       IconButton.filledTonal(
-                        style: IconButton.styleFrom(backgroundColor: Colors.white),
-                        onPressed: () => Navigator.push(
-                            context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
+                        style: IconButton.styleFrom(backgroundColor: Colors.white, side: const BorderSide(color: C.line)),
+                        onPressed: () => _push(const ProfileScreen()),
                         icon: const Icon(Icons.person_outline),
                       ),
                     ]),
                   ),
                 ),
                 if (app.error != null) _errorBanner(app.error!),
-                if (CaptureBridge.supported && !app.captureEnabled) _captureBanner(context),
+                if (CaptureBridge.supported && !app.captureEnabled) _captureBanner(),
 
                 // Cartão principal
                 Container(
                   padding: const EdgeInsets.all(22),
-                  decoration: BoxDecoration(color: C.ink, borderRadius: BorderRadius.circular(28)),
+                  decoration: heroDecoration(),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
                       _monthButton(Icons.chevron_left, () => app.shiftMonth(-1)),
@@ -111,9 +126,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
-                      child: Text(brl(spent),
+                      child: AnimatedMoney(spent,
                           style: const TextStyle(
-                              color: Colors.white, fontSize: 38, fontWeight: FontWeight.w800, letterSpacing: -1.5)),
+                              color: Colors.white, fontSize: 40, fontWeight: FontWeight.w800, letterSpacing: -1.6)),
                     ),
                     if (prevSpent > 0) ...[
                       const SizedBox(height: 6),
@@ -121,12 +136,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                     const SizedBox(height: 18),
                     Row(children: [
-                      Expanded(child: _miniStat('Entradas', brl(income), C.lime)),
-                      Expanded(child: _miniStat('Investido', brl(invested), Colors.white)),
-                      Expanded(child: _miniStat('Saldo', brl(income - spent - invested), Colors.white)),
+                      Expanded(child: _miniStat('Entradas', income, C.lime)),
+                      Expanded(child: _miniStat('Investido', invested, Colors.white)),
+                      Expanded(child: _miniStat('Saldo', income - spent - invested, Colors.white)),
                     ]),
                   ]),
                 ),
+
+                // Atalhos
+                const SizedBox(height: 16),
+                Row(children: [
+                  Expanded(child: QuickAction(icon: Icons.add, label: 'Lançar', highlight: true, onTap: () => openTxEditor(context))),
+                  Expanded(child: QuickAction(icon: Icons.shopping_cart_checkout, label: 'Posso\ncomprar?', onTap: () => _push(const CanIBuyScreen()))),
+                  Expanded(child: QuickAction(icon: Icons.calendar_month_outlined, label: 'Calendário', onTap: () => _push(const CalendarScreen()))),
+                  Expanded(child: QuickAction(icon: Icons.auto_graph, label: 'E se...?', onTap: () => _push(const SimulatorScreen(showAppBar: true)))),
+                  Expanded(child: QuickAction(icon: Icons.credit_card, label: 'Dívidas', onTap: () => _push(const DebtsScreen(showAppBar: true)))),
+                ]),
+
+                if (isCurrent) ...[
+                  const SectionTitle('Previsão do mês'),
+                  _forecastCard(),
+                ],
 
                 if (alerts.isNotEmpty) ...[
                   const SectionTitle('Alertas'),
@@ -160,11 +190,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     Container(
                                         width: 10,
                                         height: 10,
-                                        decoration:
-                                            BoxDecoration(color: catOf(e.key).color, shape: BoxShape.circle)),
+                                        decoration: BoxDecoration(color: catOf(e.key).color, shape: BoxShape.circle)),
                                     const SizedBox(width: 8),
-                                    Expanded(
-                                        child: Text(e.key, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                                    Expanded(child: Text(e.key, maxLines: 1, overflow: TextOverflow.ellipsis)),
                                     Text(brl(e.value), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                                   ]),
                                 ),
@@ -172,6 +200,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           ),
                         ]),
                 ),
+
+                if (upcoming.isNotEmpty) ...[
+                  SectionTitle('Próximas parcelas', action: 'Ver dívidas', onAction: () => _push(const DebtsScreen(showAppBar: true))),
+                  AppCard(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    child: Column(children: [
+                      for (final d in upcoming.take(3))
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const CatIcon('Dívidas', size: 38),
+                          title: Text(d.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: Text(
+                              'Parcela ${d.paidCount() + 1}/${d.installments} • ${DateFormat("d 'de' MMM", 'pt_BR').format(d.nextDue()!)}'),
+                          trailing: Text(brl(d.installmentAmount), style: const TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                    ]),
+                  ),
+                ],
 
                 SectionTitle('${AppConfig.assistantName} analisou seu mês'),
                 _insightsCard(),
@@ -196,13 +242,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _forecastCard() {
+    final f = app.forecast();
+    final ratio = f.income > 0 ? f.projected / f.income : 0.0;
+    final ok = f.income <= 0 || f.projected <= f.income;
+    return AppCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Nesse ritmo você fecha o mês em', style: TextStyle(color: C.muted, fontSize: 13)),
+              const SizedBox(height: 2),
+              AnimatedMoney(f.projected, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, letterSpacing: -0.8)),
+            ]),
+          ),
+          Pill(
+            f.income <= 0 ? 'sem renda' : (ok ? 'sobra ${brl(f.freeAtEnd)}' : 'falta ${brl(-f.freeAtEnd)}'),
+            bg: ok ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+            fg: ok ? C.green : C.red,
+          ),
+        ]),
+        const SizedBox(height: 12),
+        if (f.income > 0) ProgressLine(value: ratio, color: C.ink),
+        const SizedBox(height: 8),
+        Text(
+          f.income > 0
+              ? 'Renda de referência ${brl(f.income)} • já gasto ${brl(f.spentSoFar)}'
+                  '${f.pendingInstallments > 0 ? ' • ${brl(f.pendingInstallments)} em parcelas a vencer' : ''}'
+              : 'Informe sua renda no Perfil (ou lance o salário) para ver quanto vai sobrar.',
+          style: const TextStyle(color: C.muted, fontSize: 12.5),
+        ),
+      ]),
+    );
+  }
+
   Widget _monthButton(IconData icon, VoidCallback? onTap) => IconButton(
         onPressed: onTap,
         icon: Icon(icon, color: onTap == null ? Colors.white24 : Colors.white),
         visualDensity: VisualDensity.compact,
       );
 
-  Widget _miniStat(String label, String value, Color color) => Column(
+  Widget _miniStat(String label, double value, Color color) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label, style: const TextStyle(color: Colors.white54, fontSize: 12)),
@@ -210,7 +290,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerLeft,
-            child: Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w700)),
+            child: AnimatedMoney(value, style: TextStyle(color: color, fontWeight: FontWeight.w700)),
           ),
         ],
       );
@@ -239,18 +319,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       );
 
-  Widget _captureBanner(BuildContext context) => Padding(
+  Widget _captureBanner() => Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: AppCard(
           color: const Color(0xFFF1E6FF),
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
+          onTap: () => _push(const ProfileScreen()),
           child: const Row(children: [
             Icon(Icons.notifications_active_outlined, color: Color(0xFF820AD1)),
             SizedBox(width: 12),
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Ative a captura do Nubank',
-                    style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF4A0478))),
+                Text('Ative a captura do Nubank', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF4A0478))),
                 SizedBox(height: 2),
                 Text('Cada compra aprovada vira um gasto aqui, sozinho.',
                     style: TextStyle(color: Color(0xFF6B2A99), fontSize: 13)),
@@ -291,11 +370,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _insightsCard() {
     if (!app.gemini.configured) {
       return AppCard(
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ProfileScreen())),
+        onTap: () => _push(const ProfileScreen()),
         child: const Row(children: [
           JoseAvatar(),
           SizedBox(width: 12),
-          Expanded(child: Text('Cole sua chave do Gemini no Perfil para eu analisar seus gastos.')),
+          Expanded(child: Text('O José está sem chave do Gemini. Toque para configurar.')),
           Icon(Icons.chevron_right),
         ]),
       );
@@ -306,7 +385,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(children: [
             const JoseAvatar(),
             const SizedBox(width: 12),
-            const Expanded(child: Text('Quer que eu dê uma olhada no seu mês e aponte onde dá pra melhorar?')),
+            const Expanded(child: Text('Quer que eu olhe seu mês e aponte onde dá pra melhorar?')),
             const SizedBox(width: 8),
             FilledButton(
               style: FilledButton.styleFrom(minimumSize: const Size(0, 42), padding: const EdgeInsets.symmetric(horizontal: 16)),
