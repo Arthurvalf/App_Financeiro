@@ -30,8 +30,13 @@ ThemeData buildTheme() {
     onSurface: C.ink,
     error: C.red,
   );
-  final base = ThemeData(useMaterial3: true, colorScheme: scheme, scaffoldBackgroundColor: C.bg);
-  final text = GoogleFonts.interTextTheme(base.textTheme).apply(bodyColor: C.ink, displayColor: C.ink);
+  final base = ThemeData(
+    useMaterial3: true,
+    colorScheme: scheme,
+    scaffoldBackgroundColor: C.bg,
+    fontFamily: GoogleFonts.inter().fontFamily,
+  );
+  final text = base.textTheme.apply(bodyColor: C.ink, displayColor: C.ink);
 
   OutlineInputBorder border(Color c, [double w = 1]) => OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),

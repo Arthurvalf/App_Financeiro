@@ -7,7 +7,6 @@ import '../config.dart';
 import '../models.dart';
 import '../services/auth_service.dart';
 import '../services/capture.dart';
-import '../services/categorizer.dart';
 import '../services/firestore.dart';
 import '../services/gemini.dart';
 
