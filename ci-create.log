@@ -1,0 +1,45 @@
+Recreating project ....
+  android/app/src/profile/AndroidManifest.xml (created)
+  android/app/src/main/res/values-night/styles.xml (created)
+  android/app/src/main/res/drawable-v21/launch_background.xml (created)
+  android/app/src/main/res/drawable/launch_background.xml (created)
+  android/app/src/main/res/values/styles.xml (created)
+  android/app/src/debug/AndroidManifest.xml (created)
+  android/.gitignore (created)
+  android/settings.gradle.kts (created)
+  android/gradle.properties (created)
+  android/gradle/wrapper/gradle-wrapper.properties (created)
+  web/icons/Icon-maskable-192.png (created)
+  web/icons/Icon-192.png (created)
+  web/icons/Icon-maskable-512.png (created)
+  web/icons/Icon-512.png (created)
+  web/manifest.json (created)
+  web/favicon.png (created)
+  web/index.html (created)
+  .gitignore (created)
+  android/financa_android.iml (created)
+  android/app/build.gradle.kts (created)
+  android/build.gradle.kts (created)
+  .idea/modules.xml (created)
+  .idea/libraries/KotlinJavaRuntime.xml (created)
+  .idea/libraries/Dart_SDK.xml (created)
+  .idea/runConfigurations/main_dart.xml (created)
+  .idea/workspace.xml (created)
+  financa.iml (created)
+  analysis_options.yaml (created)
+Resolving dependencies...
+Downloading packages...
+Got dependencies.
+Wrote 31 files.
+
+All done!
+You can find general documentation for Flutter at: https://docs.flutter.dev/
+Detailed API documentation is available at: https://api.flutter.dev/
+If you prefer video documentation, consider: https://www.youtube.com/c/flutterdev
+
+In order to run your application, type:
+
+  $ flutter run
+
+Your application code is in ./lib/main.dart.
+

@@ -1,0 +1,16 @@
+
+::group::✅ Passing tests
+✅ /home/runner/work/App_Financeiro/App_Financeiro/mobile/test/parser_test.dart: compra no crédito do Nubank
+✅ /home/runner/work/App_Financeiro/App_Financeiro/mobile/test/parser_test.dart: valor com milhar
+✅ /home/runner/work/App_Financeiro/App_Financeiro/mobile/test/parser_test.dart: pix enviado para pessoa
+✅ /home/runner/work/App_Financeiro/App_Financeiro/mobile/test/parser_test.dart: pix recebido
+✅ /home/runner/work/App_Financeiro/App_Financeiro/mobile/test/parser_test.dart: ignora fatura e compra negada
+✅ /home/runner/work/App_Financeiro/App_Financeiro/mobile/test/parser_test.dart: categorias por palavra-chave
+✅ /home/runner/work/App_Financeiro/App_Financeiro/mobile/test/widget_test.dart: codec do Firestore ida e volta
+✅ /home/runner/work/App_Financeiro/App_Financeiro/mobile/test/debt_test.dart: vencimentos respeitam meses curtos
+✅ /home/runner/work/App_Financeiro/App_Financeiro/mobile/test/debt_test.dart: parcelas pagas e restantes
+✅ /home/runner/work/App_Financeiro/App_Financeiro/mobile/test/debt_test.dart: quanto cai em cada mês
+✅ /home/runner/work/App_Financeiro/App_Financeiro/mobile/test/debt_test.dart: regra de categoria
+::endgroup::
+
+🎉 11 tests passed.
